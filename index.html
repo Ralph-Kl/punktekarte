@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digitale Punktekarte</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        h2 {
+            color: #764ba2;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .mode-btn:not(.active) {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 18px;
+            transition: border 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .btn-redeem {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        #qrcode {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .points-display {
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .points-number {
+            font-size: 72px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .points-label {
+            font-size: 20px;
+            opacity: 0.9;
+        }
+
+        .animation-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .particle {
+            position: absolute;
+            font-size: 30px;
+            animation: float 2s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0) scale(0);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-300px) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .success-message {
+            background: #4CAF50;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error-message {
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="animation-container" id="animationContainer"></div>
+    
+    <div class="container">
+        <h1>✨ Digitale Punktekarte ✨</h1>
+        
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="switchMode('merchant')">Händler</button>
+            <button class="mode-btn" onclick="switchMode('customer')">Kunde</button>
+        </div>
+
+        <!-- Händler-Ansicht -->
+        <div id="merchantView" class="view active">
+            <h2>Punkte vergeben</h2>
+            
+            <div class="input-group">
+                <label for="pointsInput">Anzahl Punkte:</label>
+                <input type="number" id="pointsInput" placeholder="z.B. 5" min="-1000" max="1000">
+            </div>
+
+            <button class="btn-primary" onclick="generateQR(false)">
+                ➕ QR-Code für Punkte geben
+            </button>
+
+            <button class="btn-redeem" onclick="generateQR(true)">
+                ➖ QR-Code für Punkte einlösen
+            </button>
+
+            <div id="qrcode"></div>
+            
+            <button class="btn-secondary" onclick="clearQR()" style="display:none;" id="clearBtn">
+                Neuer QR-Code
+            </button>
+
+            <div class="success-message" id="merchantSuccess"></div>
+        </div>
+
+        <!-- Kunden-Ansicht -->
+        <div id="customerView" class="view">
+            <h2>Deine Punktekarte</h2>
+            
+            <div class="points-display">
+                <div class="points-label">Deine Punkte</div>
+                <div class="points-number" id="customerPoints">0</div>
+                <div class="points-label">💝 Herzlichen Dank! ⭐</div>
+            </div>
+
+            <button class="btn-secondary" onclick="resetPoints()">
+                Punkte zurücksetzen
+            </button>
+
+            <div class="success-message" id="customerSuccess"></div>
+            <div class="error-message" id="customerError"></div>
+        </div>
+    </div>
+
+    <script>
+        let qrcode = null;
+
+        // Initialisierung
+        window.onload = function() {
+            updateCustomerPoints();
+            checkForPointsInURL();
+        };
+
+        function switchMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+            
+            if (mode === 'merchant') {
+                document.querySelector('.mode-btn:first-child').classList.add('active');
+                document.getElementById('merchantView').classList.add('active');
+            } else {
+                document.querySelector('.mode-btn:last-child').classList.add('active');
+                document.getElementById('customerView').classList.add('active');
+            }
+        }
+
+        function generateQR(isRedeem) {
+            const points = parseInt(document.getElementById('pointsInput').value);
+            
+            if (!points || points === 0) {
+                alert('Bitte gib eine Punktzahl ein!');
+                return;
+            }
+
+            const actualPoints = isRedeem ? -Math.abs(points) : Math.abs(points);
+            const url = window.location.href.split('?')[0] + '?points=' + actualPoints + '&action=add';
+
+            clearQR();
+            
+            qrcode = new QRCode(document.getElementById('qrcode'), {
+                text: url,
+                width: 256,
+                height: 256,
+                colorDark: '#667eea',
+                colorLight: '#ffffff',
+            });
+
+            document.getElementById('clearBtn').style.display = 'block';
+            
+            const msg = document.getElementById('merchantSuccess');
+            msg.textContent = isRedeem ? 
+                `QR-Code für ${Math.abs(actualPoints)} Punkte einlösen erstellt!` :
+                `QR-Code für ${actualPoints} Punkte erstellt!`;
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 3000);
+        }
+
+        function clearQR() {
+            document.getElementById('qrcode').innerHTML = '';
+            document.getElementById('clearBtn').style.display = 'none';
+            qrcode = null;
+        }
+
+        function checkForPointsInURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const points = parseInt(urlParams.get('points'));
+            const action = urlParams.get('action');
+
+            if (points && action === 'add') {
+                addPoints(points);
+                switchMode('customer');
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+
+        function addPoints(points) {
+            let currentPoints = parseInt(localStorage.getItem('loyaltyPoints') || '0');
+            currentPoints += points;
+            
+            if (currentPoints < 0) {
+                showError('Nicht genügend Punkte zum Einlösen!');
+                return;
+            }
+
+            localStorage.setItem('loyaltyPoints', currentPoints);
+            updateCustomerPoints();
+
+            // Animation und Effekte
+            if (points > 0) {
+                createParticles('❤️', points);
+                createParticles('⭐', points);
+                playSound(true);
+            } else {
+                createParticles('💫', Math.abs(points));
+                playSound(false);
+            }
+            
+            vibrate();
+
+            const msg = document.getElementById('customerSuccess');
+            msg.textContent = points > 0 ? 
+                `🎉 ${points} Punkte gutgeschrieben!` :
+                `✅ ${Math.abs(points)} Punkte eingelöst!`;
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 3000);
+        }
+
+        function updateCustomerPoints() {
+            const points = localStorage.getItem('loyaltyPoints') || '0';
+            document.getElementById('customerPoints').textContent = points;
+        }
+
+        function resetPoints() {
+            if (confirm('Möchtest du wirklich alle Punkte zurücksetzen?')) {
+                localStorage.setItem('loyaltyPoints', '0');
+                updateCustomerPoints();
+            }
+        }
+
+        function createParticles(emoji, count) {
+            const container = document.getElementById('animationContainer');
+            const particleCount = Math.min(count * 3, 30);
+
+            for (let i = 0; i < particleCount; i++) {
+                setTimeout(() => {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.textContent = emoji;
+                    particle.style.left = Math.random() * window.innerWidth + 'px';
+                    particle.style.top = window.innerHeight / 2 + 'px';
+                    particle.style.animationDelay = Math.random() * 0.5 + 's';
+                    
+                    container.appendChild(particle);
+                    
+                    setTimeout(() => particle.remove(), 2000);
+                }, i * 50);
+            }
+        }
+
+        function playSound(isPositive) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            if (isPositive) {
+                oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
+                oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2);
+            } else {
+                oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
+            }
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
+
+        function vibrate() {
+            if ('vibrate' in navigator) {
+                navigator.vibrate([100, 50, 100]);
+            }
+        }
+
+        function showError(message) {
+            const msg = document.getElementById('customerError');
+            msg.textContent = message;
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 3000);
+        }
+    </script>
+</body>
+</html>
